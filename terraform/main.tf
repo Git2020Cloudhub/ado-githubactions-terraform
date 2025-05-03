@@ -16,3 +16,11 @@ resource "azurerm_container_registry" "acr" {
 }
 
 # …plus the App Service and other resources…
+resource "azurerm_app_service_plan" "plan" { … }
+
+# classic App Service
+resource "azurerm_app_service" "appadogithubactionsterraform" {
+  name                = "web-${var.rg_name}"
+  app_service_plan_id = azurerm_app_service_plan.plan.id
+  …
+}

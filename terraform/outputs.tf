@@ -1,3 +1,3 @@
 output "app_url" {
-  value = azurerm_linux_web_app.app.default_hostname
+  value = azurerm_app_service.appadogithubactionsterraform.default_site_hostname
 }
