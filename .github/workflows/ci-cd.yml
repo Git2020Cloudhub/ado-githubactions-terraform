@@ -1,0 +1,67 @@
+name: CI‑CD
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+  workflow_dispatch:
+
+# ---------- 1.  Project‑specific defaults ----------
+env:
+  RG_NAME: adogithubtf-rg
+  LOCATION: uksouth
+  IMAGE_NAME: ado-github-terraform-demo                 # <- matches variables.tf
+  ACR_LOGIN_SERVER: acradogithubtf.azurecr.io           # suffix → full hostname
+
+jobs:
+# ---------- 2.  Build & push the container ----------
+  build-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Log in to the registry
+      - name: ACR login
+        uses: azure/docker-login@v1
+        with:
+          login-server: ${{ env.ACR_LOGIN_SERVER }}
+          username:     ${{ secrets.ACR_USERNAME }}      # admin‑enabled creds
+          password:     ${{ secrets.ACR_PASSWORD }}
+
+      - name: Build & push image
+        run: |
+          docker build -t $ACR_LOGIN_SERVER/${IMAGE_NAME}:latest ./app
+          docker push  $ACR_LOGIN_SERVER/${IMAGE_NAME}:latest
+
+# ---------- 3.  Terraform deploy ----------
+  deploy:
+    needs: build-push
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: terraform
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        run: terraform init -input=false
+        env: *azure_creds
+
+      - name: Terraform Apply
+        run: |
+          terraform apply -auto-approve \
+            -var "rg_name=${{ env.RG_NAME }}" \
+            -var "location=${{ env.LOCATION }}" \
+            -var "acr_suffix=adogithubtf" \
+            -var "image_name=${{ env.IMAGE_NAME }}"
+        env: *azure_creds
+
+# ---------- 4.  Re‑usable block for ARM creds ----------
+# (keeps the file tidy; YAML anchor/alias syntactic sugar)
+env:
+  ARM_CLIENT_ID:       ${{ secrets.AZURE_CLIENT_ID }}
+  ARM_CLIENT_SECRET:   ${{ secrets.AZURE_CLIENT_SECRET }}
+  ARM_TENANT_ID:       ${{ secrets.AZURE_TENANT_ID }}
+  ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
