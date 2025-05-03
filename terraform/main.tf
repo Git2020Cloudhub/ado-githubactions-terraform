@@ -3,7 +3,7 @@ terraform {
     azurerm = { source = "hashicorp/azurerm", version = "~> 3.0" }
   }
   backend "azurerm" {
-    resource_group_name  = "tfstate-rg"
+    resource_group_name  = "adogithubtf-rg"
     storage_account_name = "tfstateadogithubactionterraform"
     container_name       = "state"
     key                  = "demo.terraform.tfstate"
