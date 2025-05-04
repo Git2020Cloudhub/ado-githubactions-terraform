@@ -51,8 +51,3 @@ resource "azurerm_linux_web_app" "app" {
   # Ensure ACR exists before creating the Web App
   depends_on = [azurerm_container_registry.acr]
 }
-
-#── Output the URL so CI picks it up ────────────────────────────────────────────
-output "app_url" {
-  value = azurerm_linux_web_app.app.default_hostname
-}
