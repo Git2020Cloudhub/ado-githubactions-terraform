@@ -28,7 +28,7 @@ resource "azurerm_app_service_plan" "plan" {
     size = "B1"
   }
 
-  # reserved = true makes this Linux‑compatible
+  # required for Linux
   reserved = true
 }
 
@@ -44,10 +44,8 @@ resource "azurerm_linux_web_app" "app" {
   }
 
   site_config {
-    # Pull the image you built & pushed in CI
     linux_fx_version = "DOCKER|${azurerm_container_registry.acr.login_server}/${var.image_name}:latest"
   }
 
-  # Ensure ACR exists before creating the Web App
   depends_on = [azurerm_container_registry.acr]
 }
