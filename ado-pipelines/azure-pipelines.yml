@@ -3,66 +3,58 @@
 # then provisions / updates the App Service with Terraform.
 # Trigger is manual so it won’t race the GitHub Actions build.
 
-trigger: none        # run from the UI → 'Run pipeline'
+trigger: none
 
 pool:
   vmImage: ubuntu-latest
 
-# ---------- Project‑specific defaults ----------
 variables:
-  RG_NAME: adogithubtf-rg
-  LOCATION: uksouth
-
-  # ACR / image
-  IMAGE_NAME: ado-github-terraform-demo
-  ACR_LOGIN_SERVER: acradogithubtf.azurecr.io
-  ACR_SERVICE_CONN: acradogithubtf‑svc     # <-- name of your ACR service connection
+  RG_NAME:           adogithubtf-rg
+  LOCATION:          uksouth
+  IMAGE_NAME:        ado-github-terraform-demo
+  ACR_LOGIN_SERVER:  acradogithubtf.azurecr.io
+  ACR_SERVICE_CONN:  acradogithubtf-svc
 
 stages:
 
-# ---------- 1.  Build & push image ----------
 - stage: BuildPush
-  displayName: Build + Push to ACR
+  displayName: Build + Push to ACR
   jobs:
-  - job: Build
-    displayName: Docker build/push
-    steps:
-    - checkout: self
+    - job: Build
+      displayName: Docker build/push
+      steps:
+        - checkout: self
+        - task: Docker@2
+          displayName: Build & Push
+          inputs:
+            command: buildAndPush
+            containerRegistry: '$(ACR_SERVICE_CONN)'
+            repository: $(IMAGE_NAME)
+            dockerfile: app/Dockerfile
+            tags: latest
+            buildContext: .
 
-    - task: Docker@2
-      displayName: Build & Push
-      inputs:
-        command: buildAndPush
-        containerRegistry: '$(ACR_SERVICE_CONN)'
-        repository: $(IMAGE_NAME)
-        dockerfile: app/Dockerfile
-        tags: latest
-        buildContext: .
-
-# ---------- 2.  Deploy with Terraform ----------
 - stage: Deploy
   displayName: Terraform Apply
   dependsOn: BuildPush
   jobs:
-  - job: Terraform
-    steps:
-    - checkout: self
-
-    - task: TerraformInstaller@1
-      inputs:
-        terraformVersion: 'latest'
-
-    - bash: |
-        cd terraform
-        terraform init -input=false
-        terraform apply -auto-approve \
-          -var "rg_name=$(RG_NAME)" \
-          -var "location=$(LOCATION)" \
-          -var "acr_suffix=adogithubtf" \
-          -var "image_name=$(IMAGE_NAME)"
-      displayName: 'terraform apply'
-      env:
-        ARM_CLIENT_ID:       $(ARM_CLIENT_ID)
-        ARM_CLIENT_SECRET:   $(ARM_CLIENT_SECRET)
-        ARM_TENANT_ID:       $(ARM_TENANT_ID)
-        ARM_SUBSCRIPTION_ID: $(ARM_SUBSCRIPTION_ID)
+    - job: Terraform
+      steps:
+        - checkout: self
+        - task: TerraformInstaller@1
+          inputs:
+            terraformVersion: 'latest'
+        - bash: |
+            cd terraform
+            terraform init -input=false
+            terraform apply -auto-approve \
+              -var "rg_name=$(RG_NAME)" \
+              -var "location=$(LOCATION)" \
+              -var "acr_suffix=$(ACR_SUFFIX)" \
+              -var "image_name=$(IMAGE_NAME)"
+          displayName: 'terraform apply'
+          env:
+            ARM_CLIENT_ID:       $(ARM_CLIENT_ID)
+            ARM_CLIENT_SECRET:   $(ARM_CLIENT_SECRET)
+            ARM_TENANT_ID:       $(ARM_TENANT_ID)
+            ARM_SUBSCRIPTION_ID: $(ARM_SUBSCRIPTION_ID)

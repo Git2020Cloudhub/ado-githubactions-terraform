@@ -1,45 +1,44 @@
-variable "github_token" {
-  description = "GitHub PAT with admin:repo_hook, repo & workflow scopes"
+variable "rg_name" {
+  description = "Name of the Resource Group"
+  type        = string
+  default     = "adogithubtf-rg"
+}
+
+variable "location" {
+  description = "Azure region"
+  type        = string
+  default     = "uksouth"
+}
+
+variable "acr_suffix" {
+  description = "Suffix for ACR name"
+  type        = string
+  default     = "adogithubtf"
+}
+
+variable "image_name" {
+  description = "Docker image name"
+  type        = string
+  default     = "ado-github-terraform-demo"
+}
+
+variable "subscription_id" {
+  description = "Azure Subscription ID"
   type        = string
 }
 
 variable "github_owner" {
-  description = "GitHub org or user that owns the repo"
+  description = "GitHub org/user"
   type        = string
 }
 
 variable "github_repository" {
-  description = "Name of the repo (e.g. ado-githubactions-terraform)"
-  type        = string
-}
-
-variable "subscription_id" {
-  description = "Azure Subscription ID to grant to the SP"
-  type        = string
-}
-
-variable "subscription_id" {
-  description = "Azure Subscription ID to grant to the SP"
+  description = "GitHub repo name"
   type        = string
 }
 
 variable "github_token" {
   description = "GitHub PAT with repo & workflow scopes"
   type        = string
+  sensitive   = true
 }
-
-variable "github_owner" {
-  description = "GitHub org/user name"
-  type        = string
-}
-
-variable "github_repository" {
-  description = "GitHub repo name (e.g. ado-githubactions-terraform)"
-  type        = string
-}
-
-#
-variable "rg_name"     { default = "adogithubtf-rg" }
-variable "location"    { default = "uksouth" }
-variable "acr_suffix"  { default = "adogithubtf" }
-variable "image_name"  { default = "ado-github-terraform-demo" }

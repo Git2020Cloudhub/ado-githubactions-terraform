@@ -8,18 +8,17 @@ on:
   workflow_dispatch:
 
 env:
-  RG_NAME:            adogithubtf-rg
-  LOCATION:           uksouth
-  ACR_SUFFIX:         adogithubtf
-  IMAGE_NAME:         ado-github-terraform-demo
-  ACR_LOGIN_SERVER:   acradogithubtf.azurecr.io
+  RG_NAME:          adogithubtf-rg
+  LOCATION:         uksouth
+  ACR_SUFFIX:       adogithubtf
+  IMAGE_NAME:       ado-github-terraform-demo
+  ACR_LOGIN_SERVER: acradogithubtf.azurecr.io
 
 jobs:
 
   deploy-infra:
     name: Deploy Infrastructure
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -46,7 +45,6 @@ jobs:
     name: Build & Push Docker Image
     needs: deploy-infra
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
