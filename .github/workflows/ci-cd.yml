@@ -1,5 +1,10 @@
 name: CI-CD
 
+env:
+  RG_NAME:            adogithubtf-rg
+  LOCATION:           uksouth
+  ACR_SUFFIX:         adogithubtf
+
 on:
   push:
     branches: [ main ]
