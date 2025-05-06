@@ -2,8 +2,7 @@ name: CI-CD
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
   pull_request:
   workflow_dispatch:
 
@@ -15,13 +14,12 @@ env:
   ACR_LOGIN_SERVER: acradogithubtf.azurecr.io
 
 jobs:
-
   deploy-infra:
     name: Deploy Infrastructure
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Azure Login
@@ -29,7 +27,27 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      # ← Add this step to install Terraform
+      # ─── BOOTSTRAP REMOTE STATE BACKEND ────────────────────────
+      - name: Create RG + Storage for Terraform state
+        run: |
+          # Ensure the RG exists
+          az group create \
+            --name ${{ env.RG_NAME }} \
+            --location ${{ env.LOCATION }}
+
+          # Create the storage account (must match backend.tf)
+          az storage account create \
+            --name tfstate${{ env.ACR_SUFFIX }} \
+            --resource-group ${{ env.RG_NAME }} \
+            --sku Standard_LRS \
+            --kind StorageV2
+
+          # Create the blob container
+          az storage container create \
+            --name state \
+            --account-name tfstate${{ env.ACR_SUFFIX }}
+
+      # ─── INSTALL TERRAFORM ─────────────────────────────────────
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
@@ -54,7 +72,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Log in to ACR
