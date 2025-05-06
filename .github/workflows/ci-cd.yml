@@ -2,21 +2,54 @@ name: CI-CD
 
 on:
   push:
-    branches: [ "main" ]
+    branches:
+      - main
   pull_request:
   workflow_dispatch:
 
 env:
-  RG_NAME: adogithubtf-rg
-  LOCATION: uksouth
-  IMAGE_NAME: ado-github-terraform-demo
-  ACR_LOGIN_SERVER: acradogithubtf.azurecr.io
+  RG_NAME:            adogithubtf-rg
+  LOCATION:           uksouth
+  ACR_SUFFIX:         adogithubtf
+  IMAGE_NAME:         ado-github-terraform-demo
+  ACR_LOGIN_SERVER:   acradogithubtf.azurecr.io
 
 jobs:
-  build-push:
+
+  deploy-infra:
+    name: Deploy Infrastructure
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Terraform Init
+        working-directory: ./terraform
+        run: terraform init -input=false
+
+      - name: Terraform Apply
+        working-directory: ./terraform
+        run: |
+          terraform apply -auto-approve \
+            -var "rg_name=${{ env.RG_NAME }}" \
+            -var "location=${{ env.LOCATION }}" \
+            -var "acr_suffix=${{ env.ACR_SUFFIX }}" \
+            -var "image_name=${{ env.IMAGE_NAME }}"
+
+  build-push:
+    name: Build & Push Docker Image
+    needs: deploy-infra
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Log in to ACR
         uses: azure/docker-login@v1
@@ -25,38 +58,10 @@ jobs:
           username:     ${{ secrets.ACR_USERNAME }}
           password:     ${{ secrets.ACR_PASSWORD }}
 
-      - name: Build & push image
+      - name: Build & Push Image
         run: |
-          docker build -t $ACR_LOGIN_SERVER/${IMAGE_NAME}:latest ./app
-          docker push    $ACR_LOGIN_SERVER/${IMAGE_NAME}:latest
-
-  deploy:
-    needs: build-push
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: terraform
-    steps:
-      - uses: actions/checkout@v4
-      - uses: hashicorp/setup-terraform@v3
-
-      - name: Terraform init
-        run: terraform init -input=false
-        env:
-          ARM_CLIENT_ID:       ${{ secrets.AZURE_CLIENT_ID }}
-          ARM_CLIENT_SECRET:   ${{ secrets.AZURE_CLIENT_SECRET }}
-          ARM_TENANT_ID:       ${{ secrets.AZURE_TENANT_ID }}
-          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Terraform apply
-        run: |
-          terraform apply -auto-approve \
-            -var "rg_name=${{ env.RG_NAME }}" \
-            -var "location=${{ env.LOCATION }}" \
-            -var "acr_suffix=adogithubtf" \
-            -var "image_name=${{ env.IMAGE_NAME }}"
-        env:
-          ARM_CLIENT_ID:       ${{ secrets.AZURE_CLIENT_ID }}
-          ARM_CLIENT_SECRET:   ${{ secrets.AZURE_CLIENT_SECRET }}
-          ARM_TENANT_ID:       ${{ secrets.AZURE_TENANT_ID }}
-          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          docker build \
+            -t ${{ env.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:latest \
+            ./app
+          docker push \
+            ${{ env.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:latest
