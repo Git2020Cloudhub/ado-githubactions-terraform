@@ -1,20 +1,10 @@
 name: CI‑CD
 
-# 1) auto‑apply on push to main
-# 2) manual dispatch with choice of apply or destroy
 on:
   push:
     branches: [ main ]
+  pull_request:
   workflow_dispatch:
-    inputs:
-      action:
-        description: "apply or destroy infra"
-        required: true
-        default: apply
-        type: choice
-        options:
-          - apply
-          - destroy
 
 env:
   RG_NAME:          adogithubtf-rg
@@ -24,10 +14,9 @@ env:
   ACR_LOGIN_SERVER: acradogithubtf.azurecr.io
 
 jobs:
-  terraform:
-    name: Terraform
+  deploy-infra:
+    name: Deploy Infrastructure
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -37,9 +26,7 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      # ── Bootstrap remote‑state backend (only on apply) ────────────────
       - name: Ensure TF state backend exists
-        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply')
         run: |
           az group create --name ${{ env.RG_NAME }} --location ${{ env.LOCATION }}
           az storage account create \
@@ -47,7 +34,7 @@ jobs:
             --resource-group ${{ env.RG_NAME }} \
             --sku Standard_LRS \
             --kind StorageV2 \
-            --https-only true
+            --access-tier Hot
           az storage container create \
             --name state \
             --account-name tfstate${{ env.ACR_SUFFIX }}
@@ -55,40 +42,23 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: latest
+          terraform_version: 'latest'
 
       - name: Terraform Init
         working-directory: ./terraform
         run: terraform init -input=false -lock-timeout=5m
 
       - name: Terraform Apply
-        if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply')
         working-directory: ./terraform
-        run: terraform apply -auto-approve \
-               -var "rg_name=${{ env.RG_NAME }}" \
-               -var "location=${{ env.LOCATION }}" \
-               -var "acr_suffix=${{ env.ACR_SUFFIX }}" \
-               -var "image_name=${{ env.IMAGE_NAME }}" \
-               -var "github_owner=${{ github.repository_owner }}" \
-               -var "subscription_id=${{ secrets.AZURE_SUBSCRIPTION_ID }}" \
-               -var "github_repository=${{ github.event.repository.name }}"
-        env:
-          ARM_CLIENT_ID:       ${{ secrets.AZURE_CLIENT_ID }}
-          ARM_CLIENT_SECRET:   ${{ secrets.AZURE_CLIENT_SECRET }}
-          ARM_TENANT_ID:       ${{ secrets.AZURE_TENANT_ID }}
-          ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-
-      - name: Terraform Destroy
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'destroy'
-        working-directory: ./terraform
-        run: terraform destroy -auto-approve \
-               -var "rg_name=${{ env.RG_NAME }}" \
-               -var "location=${{ env.LOCATION }}" \
-               -var "acr_suffix=${{ env.ACR_SUFFIX }}" \
-               -var "image_name=${{ env.IMAGE_NAME }}" \
-               -var "github_owner=${{ github.repository_owner }}" \
-               -var "subscription_id=${{ secrets.AZURE_SUBSCRIPTION_ID }}" \
-               -var "github_repository=${{ github.event.repository.name }}"
+        run: |
+          terraform apply --auto-approve \
+            --var="rg_name=${{ env.RG_NAME }}" \
+            --var="location=${{ env.LOCATION }}" \
+            --var="acr_suffix=${{ env.ACR_SUFFIX }}" \
+            --var="image_name=${{ env.IMAGE_NAME }}" \
+            --var="github_owner=${{ github.repository_owner }}" \
+            --var="github_repository=${{ github.repository }}" \
+            --var="subscription_id=${{ secrets.AZURE_SUBSCRIPTION_ID }}"
         env:
           ARM_CLIENT_ID:       ${{ secrets.AZURE_CLIENT_ID }}
           ARM_CLIENT_SECRET:   ${{ secrets.AZURE_CLIENT_SECRET }}
@@ -97,10 +67,8 @@ jobs:
 
   build-push:
     name: Build & Push Docker Image
-    needs: terraform
-    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply')
+    needs: deploy-infra
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
