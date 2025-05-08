@@ -1,11 +1,18 @@
-name: CI‑CD
+name: CI-CD
 
+# 1) auto-apply on push to main  
+# 2) run on PRs  
+# 3) manual dispatch via the UI
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
   pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
+# global env
 env:
   RG_NAME:          adogithubtf-rg
   LOCATION:         uksouth
@@ -17,6 +24,7 @@ jobs:
   deploy-infra:
     name: Deploy Infrastructure
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -28,13 +36,17 @@ jobs:
 
       - name: Ensure TF state backend exists
         run: |
-          az group create --name ${{ env.RG_NAME }} --location ${{ env.LOCATION }}
+          az group create \
+            --name ${{ env.RG_NAME }} \
+            --location ${{ env.LOCATION }}
+
           az storage account create \
             --name tfstate${{ env.ACR_SUFFIX }} \
             --resource-group ${{ env.RG_NAME }} \
             --sku Standard_LRS \
             --kind StorageV2 \
             --access-tier Hot
+
           az storage container create \
             --name state \
             --account-name tfstate${{ env.ACR_SUFFIX }}
@@ -69,6 +81,7 @@ jobs:
     name: Build & Push Docker Image
     needs: deploy-infra
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
